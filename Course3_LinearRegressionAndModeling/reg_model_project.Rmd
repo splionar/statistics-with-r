@@ -1,0 +1,296 @@
+---
+title: "Modeling and prediction for movies"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+```
+
+### Load data
+
+Make sure your data and R Markdown files are in the same directory. When loaded
+your data file will be called `movies`. Delete this note when before you submit 
+your work. 
+
+```{r load-data}
+load("movies.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+**Generabizality**:  
+The dataset contains variables which are independent between observations. Thus, requirement for random sampling is satisfied. Also, there are 651 observations. The number of observations is less than 10% of the total movies registered in IMDB and Rotten Tomatoes database, and large enough (more than 10, or 30 for high-skewed data) to draw generabizality. As random sampling and number of observations are satisfied, we can draw generabizality from this dataset.
+ 
+
+**Causality** : The dataset is observational study. Causality can only be concluded if there is follow up experimental study. Therefore, we can only draw correlation.
+
+* * *
+
+## Part 2: Research question  
+With the given dataset, we would like to construct parsimonious linear regression model to predict IMDB rating of a movie. A parsimonious model is desirable because it accomplishes desired level of prediction with as few predictor as possible.
+
+In order to achieve parsimony, we select variables which hypothetically have correlations to IMDB rating. Then we will validate these questions:  
+1. Are there correlation between `critics_score`, `audience_score` and `imdb_rating`?  
+2. Is there correlation between `imdb_num_votes` and `imdb_rating`? Movies which have more number of votes are hypothetically more popular or awaited, hence could have higher rating.  
+3. Are there correlation between `critics_rating`, `audience_rating` and `imdb_rating`?  
+4. Do movies with specific genre have higher rating? We will evaluate using `genre` and `imdb_rating`.  
+5. Movies which win awards could have higher rating than those which don't. We will evaluate using `best_pic_nom`, `best_pic_win`, `best_actor_win`, `best_actress_win`, `best_dir_win`, `top200_box` and `imdb_rating` variables.
+
+* * *
+
+## Part 3: Exploratory data analysis  
+**Q1. Are there correlation between `critics_score`, `audience_score` and `imdb_rating`?**  
+Let's contruct scatter plot with fitted regression line
+```{r}
+par(mfcol = c(1,2))
+plot(movies$audience_score, movies$imdb_rating)
+abline(lm(movies$imdb_rating ~ movies$audience_score))
+plot(movies$critics_score, movies$imdb_rating)
+abline(lm(movies$imdb_rating ~ movies$critics_score))
+```
+
+From the plots, it looks `imdb_score` is linearly correlated to `audience_score` and `critics_score`. Let's see how much they correlate.
+
+```{r}
+with(movies, cor(imdb_rating, critics_score))
+with(movies, cor(imdb_rating, audience_score))
+```
+
+With correlations 0.76 and 0.86, `imdb_score` is highly linearly correlated to `audience_score` and `critics_score`.
+
+**Q2. Is there correlation between `imdb_num_votes` and `imdb_rating`? Movies which have more number of votes are hypothetically more popular or awaited, hence could have higher rating.**   
+
+Similar to previous question, let's contruct scatter plot and see how much those two variables are correlated. 
+```{r}
+plot(movies$imdb_num_votes, movies$imdb_rating)
+abline(lm(movies$imdb_rating ~ movies$imdb_num_votes))
+with(movies, cor(imdb_num_votes, imdb_rating))
+```
+
+We see moderate correlations and we learn that movies having extremely large votes tend to have high IMDB rating. 
+
+**Q3. Are there correlation between `critics_rating`, `audience_rating` and `imdb_rating`?**  
+
+Let's first evalutate `critics_rating` to `imdb_rating`. We construct summary table of mean of `imdb_rating`, grouped by three categorical levels of `critics_rating` and plot the numbers into barplot
+```{r}
+summary1 <- movies %>%
+        group_by(critics_rating) %>%
+        summarise(mean_rating = mean(imdb_rating))
+
+summary1
+
+ggplot(data = summary1, aes(x=critics_rating, y = mean_rating)) + geom_bar(stat = "identity")
+```
+
+We see that movies with `critical_rating` of "Certified Fresh" have the highest `imdb_rating` mean, followed by "Fresh" and "Rotten". How about `audience_rating`? Let's construct similar summary table and barplot.
+
+```{r}
+summary2 <- movies %>%
+        group_by(audience_rating) %>%
+        summarise(mean_rating = mean(imdb_rating))
+
+summary2
+
+ggplot(data = summary2, aes(x=audience_rating, y = mean_rating)) + geom_bar(stat = "identity")
+```
+
+Movies with `audience_rating` "upright", have higher rating mean than "spilled".
+
+**Q4. Do movies with specific genre have higher rating? We will evaluate using `genre` and `imdb_rating`.**  
+
+Let's construct summary table of `imdb_rating` means, grouped by different levels of `genre` and its barplot.
+```{r}
+summary3 <- movies %>%
+        group_by(genre) %>%
+        summarise(mean_rating = mean(imdb_rating))
+
+summary3
+
+ggplot(data = summary3, aes(x=genre, y = mean_rating)) + geom_bar(stat = "identity")
+```
+
+I don't want to spend so much time to tidy the xlabel of the barplot, since this is just explanatory analysis. Anyway, from summary table and barplot above, we can see certain genres have higher means of rating. For example, documentary movies are rated with mean as high as 7.65, while comedy movies as low as 5.74.
+
+**Q5. Movies which win awards could have higher rating than those which don't. We will evaluate using `best_pic_nom`, `best_pic_win`, `best_actor_win`, `best_actress_win`, `best_dir_win`, `top200_box` and `imdb_rating` variables.**  
+
+Let's construct summary table of each explanatory variable to response variable `imdb_rating`. As this is repetitive task, we create function `summarise_func` and do for loop to output the mean of `imdb_rating` for each levels in the explanatory variables.
+
+```{r echo=TRUE}
+summarise_func <- function(col_name){
+        require("dplyr")
+        a<- movies %>%
+        group_by_(col_name) %>%
+        summarise(mean_rating = mean(imdb_rating), count = n())
+        print(a)
+        
+}
+
+variables <- names(movies)[19:24]
+
+for (var in variables){
+        summarise_func(var)
+}
+
+
+```
+
+All of the respective variables generally yield higher `imdb_rating` when their values are "yes". However, count number of "yes" is small, and we need to be wary of this, especially `best_pic_win` where "yes" response is less than 10.
+ 
+* * *
+
+## Part 4: Modeling
+
+We will construct our linear regression model using forward stepwise method. We will add explanatory variable one-by-one and evaluate if there is increase in adjusted R-squared and decrease in sum of squared of residuals. We start from constructing linear regression model between response variable `imdb_rating` and one explanatory variable `audience_score`. We use forward stepwise method because there are some variables which we are more confident to yield better predictive model, and we will add these variables in the order of confidence. 
+
+```{r}
+m <- lm(imdb_rating ~ audience_score, data = movies)
+summary(m)
+sum(m$residuals^2)
+```
+
+Add `critics_score`
+
+```{r}
+m1 <- lm(imdb_rating ~ critics_score + audience_score, data = movies)
+summary(m1)
+sum(m1$residuals^2)
+```
+
+There is increase in adjusted R-squared and decrease in sum of squared residuals. Both variables also appear to be statistically significant (small p-values). Although `critics_score` and `audience_score` subject to collinearity (correlation as high as 0.70), we will still use both variables.
+
+```{r}
+with(movies, cor(critics_score, audience_score))
+```
+
+Continue, add `imdb_num_votes`.
+
+```{r}
+m2 <- lm(imdb_rating ~ critics_score + audience_score + imdb_num_votes, data = movies)
+summary(m2)
+sum(m2$residuals^2)
+```
+
+We get better metrics. Continue, add `critics_rating`.
+
+```{r}
+m3 <- lm(imdb_rating ~ critics_score + audience_score + imdb_num_votes + critics_rating, data = movies)
+summary(m3)
+sum(m3$residuals^2)
+```
+
+Add `audience_rating`.
+```{r}
+m4 <- lm(imdb_rating ~ critics_score + audience_score + imdb_num_votes + critics_rating + audience_rating, data = movies)
+summary(m4)
+sum(m4$residuals^2)
+```
+
+Add `genre`.
+
+```{r}
+m5 <- lm(imdb_rating ~ critics_score + audience_score + imdb_num_votes + critics_rating + audience_rating + genre, data = movies)
+summary(m5)
+sum(m5$residuals^2)
+```
+
+Up to this point, we still get desirable adjusted R-squared, sum of squared residuals, and p-values. Now we add `best_pic_nom`.
+
+```{r}
+m6 <- lm(imdb_rating ~ critics_score + audience_score + imdb_num_votes + critics_rating + audience_rating + genre + best_pic_nom, data = movies)
+summary(m6)
+sum(m6$residuals^2)
+```
+`best_pic_nom` has no significant impact, hence we exclude this variable. I have done similar thing with,`best_pic_win`, `best_actor_win`, `best_actress_win`, `best_dir_win`, and `top200_box`. It turns out, all of these variables don't have significance in improving predictability of our model. Hence, we exclude all of them.
+
+Our finalized model is the following:
+
+```{r}
+m5$call
+m5$coefficients
+```
+
+The coefficents refer to mean of increase/decrease of imdb_rating every addition of 1 in numerical explanatory variables or if it is categorized under respective categorical variables. 
+
+**Model Diagnostics**
+
+        I. Linear relationship between each numerical explanatory variable and y  
+Yes, we have evaluated this in previous section.
+
+        II. Nearly normal residuals with mean 0
+```{r}
+hist(m5$residuals)
+qqnorm(m5$residuals)
+qqline(m5$residuals)
+```
+
+Yes. We can see from histogram and Q-Q plot. The residuals are a little left skewed. Inspite of that, the residuals are concentrated in normal line region.
+
+        III. Constant variability of residuals  
+```{r}
+plot(m5$residuals ~ m5$fitted)
+plot(abs(m5$residuals) ~ m5$fitted)
+```
+
+Yes. It seems the lower fitted value has larger variability. However, variability is generally constant. We can still count by hands, out of 651 observations, the number of residuals in the lower fitted values which are highly variable. 
+
+        IV. Independent residuals
+
+```{r}
+plot(m5$residuals)
+```
+
+Yes. residuals are random.
+
+
+* * *
+
+## Part 5: Prediction
+Let's predict IMDB rating of movie titled "Peter Rabbit". Actual rating in IMDB is 6.3.
+```{r}
+peter_rabbit <- data.frame(critics_score = 58, audience_score = 60, imdb_num_votes = 2109, critics_rating = "Rotten", audience_rating = "Upright", genre = "Animation")
+predict(m5, peter_rabbit, interval="predict") 
+```
+
+Our prediction is 5.90. With 95% confidence interval, lower bound of predicted rating is 4.969 and upper bound is 6.837. Using our predicted model, we are 95% confident that the actual rating lies within this range.
+
+Let's try to predict lower rated movie, "The Emoji Movie". Its actual IMDB rating is 3.0.
+```{r}
+emoji <- data.frame(critics_score = 9, audience_score = 39, imdb_num_votes = 35502, critics_rating = "Rotten", audience_rating = "Spilled", genre = "Animation")
+predict(m5, emoji, interval="predict") 
+```
+
+Our 95% confidence interval model fails to capture the actual rating. The lower rating movie has higher residual variability as described in the previous section.
+
+How about high rated movie? Let's try to predict "Call Me by Your Name". Its actual IMDB rating is 8.1.
+
+```{r}
+call_me <- data.frame(critics_score = 96, audience_score = 86, imdb_num_votes = 64883, critics_rating = "Certified Fresh", audience_rating = "Upright", genre = "Drama")
+predict(m5, call_me, interval="predict") 
+```
+
+Our 95% confidence interval model succeeds to capture the actual rating.
+
+
+* * *
+
+## Part 6: Conclusion
+
+We have successfully built our parsimonious linear regression model to predict IMDB rating. Although all of the potential explanatory variables seemed to have correlation to IMDB rating, it turns out some of them are not statistically significant in our model. 
+
+Our model predicts less accurate for lower-rated movies. It is shown from the higher variability in the residuals for lower rating predictions. This could be because our sample contains more data concentrated in mid-range ratings and human behavior when a movie is disliked, i.e. disliked movie may be rated from 0-5, while liked movie from 8-10.
+
+

@@ -1,0 +1,125 @@
+---
+title: "Statistical inference with the GSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+```
+
+### Load data
+
+```{r load-data, results='asis'}
+load("gss.Rdata")
+```
+
+* * *
+
+## Part 1: Data 
+**Generabizality**: Conditions for generabizality are as follows:
+
+1. Independence: Sampled observations must be independent.
+    + random sample/assignment  
+    + if sampling without replacement, n<10% of population
+        
+2. Sample size/skew: n >= 30, larger if the population distribution is very skewed.
+
+This study has sample size of 57,061. It is less than 10% of the whole United States population, and large enough to dispel effect of skewness. This satisfies the sample size requirement for generabizality of United States population. In addition, random sampling is conducted. Therefore, this study meets criterias for generabizality of United States population.  
+
+**Causality** : The survey is observational study. Causality can only be concluded if there is follow up experimental study. Therefore, we can only draw correlation from this study.
+
+* * *
+
+## Part 2: Research question
+**Between different races in United States (White, Black, others), is there any distinctive proportion of employment types, i.e. self-employed or work for someone else?**
+
+This research question is of interest to the author. As a person who grows in one country in South East Asia, the author observes there is distinctive proportion in the type of employment between different races. Many anthropologists hypothizes this phenomenon has complex links between culture and history on how certain races came into the country. The author is eager to explore whether similar phenomenon occurs in United States, and learn its inference.
+
+* * *
+
+## Part 3: Exploratory data analysis
+We subset the dataset into only variables of our interest, i.e. `race` and `wrkslf`. Beforehand, let's see summaries of those two variables 
+```{r}
+summary(gss$race)
+summary(gss$wrkslf)
+```
+
+We create new dataframe `df` with only `race` and `wrkslf` variables, and remove all the NAs.
+```{r}
+df <- gss %>%
+        select(race,wrkslf) %>%
+        na.omit()
+```
+
+From the new created dataframe `df`, let's see the proportion of self-employed and working for someone else.
+```{r}
+overall <- df %>%
+        group_by(wrkslf) %>%
+        summarise(n = n()) %>%
+        mutate(freq = n / sum(n))
+overall
+```
+And compare the overall proportion, with type of employment of different races
+```{r}
+by_race <- df %>%
+        group_by(race, wrkslf) %>%
+        summarise(n=n()) %>%
+        mutate(freq = n / sum(n))
+by_race
+```
+
+```{r}
+ggplot(data=by_race, aes(x = race, y = freq*100, fill = wrkslf)) + 
+        geom_bar(stat = "identity") + 
+        geom_hline(aes(yintercept = overall[["freq"]][2]*100, linetype = "Overall proportion working \nfor someone else")) + 
+        labs(title = "Proportion of employment type between races", y = "Percentage")
+```
+
+From summary table and plot above, we can see that black race has relatively larger proportion working for someone else. `0.937` black race works for someone else, compared to overall proportion of `0.88`. From this exlanatory data analysis, we see there is correlation between races to employment types. In the inference below, we will see if this case happens only by chance, or indeed employemet types and races are dependent.
+
+* * *
+
+## Part 4: Inference
+**Hypoptheses:**
+Null hypothesis (nothing going on): Races and employment types are independent. Employment types do not vary by races.
+Alternative hypothesis (something going on): Races and employment types are dependent. Employment types do vary by races.
+
+**Method: **
+We want to examine relationship between multiple categorical variables. In this problem, we have three categorical variables (race) with two levels (wrkslf). Hence, chi-square independence test is the most suitable to evaluate the inference. This method does not have confidence interval and p-value association. 
+
+**Conditions:**
+Conditions of the data set are met to conduct chi-square independence test. 
+1. Independence: Sampled observations are independent.
+* random sample
+* n < 10% population
+* each case only contributes one cell in the table
+
+2. Sample size: Each particular scenario has at least 5 expected cases
+
+**Chi-square independence test**  
+Let's see the actual contingency table of employment type vs race.
+```{r}
+t<- table(df$race, df$wrkslf)
+t
+```
+
+
+For additional information, let's compare with expected contingency table, if null hypothesis is true.
+```{r}
+chisq.test(t)$expected
+```
+From the actual contingency table `t`,  we run  `chisq.test()` function, which is built in function to perform chi-square independence test.
+```{r}
+chisq.test(t)
+```
+p-value is near 0. Hence, we reject our null hypothesis in favor of our alternative hypothesis. We conclude that races and employment types are dependent. Employment types do vary by races.

@@ -1,5 +1,6 @@
 ---
-title: "Modeling and prediction for movies"
+title: "Modeling and Prediction for Movie Ratings"
+date: "28 February 2018"
 output: 
   html_document: 
     fig_height: 4

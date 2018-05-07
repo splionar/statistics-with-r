@@ -1,5 +1,6 @@
 ---
 title: "Statistical inference with the GSS data"
+date: "16 February 2018"
 output: 
   html_document: 
     fig_height: 4
